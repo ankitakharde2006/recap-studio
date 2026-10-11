@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
+  "mcp": {
+    "pdf": {
+      "type": "local",
+      "command": [
+        "mcp-pdf-server",
+        "--stdio"
+      ],
+      "timeout": 60000
+    },
+    "mermaid": {
+      "type": "local",
+      "command": [
+        "mermaid-mcp-server"
+      ]
+    }
+  },
+  "agent": {
+    "recap-reviewer": {
+      "description": "Checks a PDF recap (summary, quiz, diagram) against the original slide text for missed concepts, misrepresentation, and unfaithful diagrams; returns a list of fixes",
+      "mode": "subagent",
+      "prompt": "{file:./reviewer-prompt.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny",
+        "websearch": "deny"
+      }
+    }
+  }
+}

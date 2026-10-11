@@ -1,4 +1,4 @@
-﻿# Recap Studio — Plan
+# Recap Studio — Plan
 
 ## Intent
 A fast, attractive static website that renders course-deck recaps from pre-generated JSON files or user-uploaded PDFs. Zero backend, flat files only.

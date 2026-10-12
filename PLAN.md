@@ -1,5 +1,9 @@
 # Recap Studio — Plan
 
+> **Status:** Revision 2 is in effect (see the bottom of this file): uploads are
+> now summarized **in the browser with no API key**. OpenRouter references below
+> describe the original Revision 1 design, kept as a trade-off record.
+
 ## Intent
 A fast, attractive static website that renders course-deck recaps from pre-generated JSON files or user-uploaded PDFs. Zero backend, flat files only.
 
@@ -90,3 +94,26 @@ FOOTER
 - OpenRouter model default: openrouter/auto (user can override in localStorage)
 - Favicon: inline SVG data URI
 - Missing recaps.json/pre-generated files: graceful degradation (upload only)
+
+## Revision 2 (current)
+
+Prompted by the user: *"browse a PDF and instantly see summary + diagram, no
+API key, no extra steps — one download button"* plus *"add the quiz also
+without hallucination"*.
+
+### Revised decisions
+- **Uploads: no LLM at all.** `pdf.js` extracts text (EOL-aware, up to 80 pages
+  / 400k chars) → `summarize.js` builds the recap extractively in-browser.
+  No Settings, no key, no Generate button, no JSON in the UI.
+- **Summary:** one topic per PDF page (slide = page), heading = first line when
+  it looks like one, points = bullet lines or top-scored sentences (quoted).
+- **Quiz:** cloze style — a real sentence with a key term blanked; the correct
+  answer and every distractor are terms that actually appear in the document.
+  Up to 8 questions; `why` quotes the source sentence verbatim. Hallucination is
+  impossible by construction.
+- **Diagram:** nodes = section headings (fallback: top terms), chained in
+  document order; ≤12 nodes; labels sanitized.
+- **Download:** one button exports the whole recap as Markdown
+  (`<title>-summary.md`: summary + quiz + Mermaid block).
+- **Demo dropdown:** kept — instant examples with zero cost.
+- **localStorage:** removed entirely (nothing left to persist).

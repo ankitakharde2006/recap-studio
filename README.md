@@ -12,12 +12,15 @@ single JSON file. Zero backend, zero frameworks, all files flat in one folder.
   question, and a running score.
 - **Mermaid diagram** — a `flowchart TD` rendered from text via CDN, dark theme,
   scrollable on mobile.
-- **Upload your own PDF** — drag & drop; `pdf.js` extracts text in your browser
-  (truncated to 12,000 chars), then **one** OpenRouter LLM call produces a recap
-  in the same schema.
-- **Your own API key** — pasted into Settings, stored only in the browser's
-  `localStorage`, sent only to OpenRouter. Demo recaps work with no key at all.
-- **Download JSON** — save any rendered recap.
+- **Upload your own PDF** — drag & drop; `pdf.js` extracts the text in your
+  browser and a built-in extractive summarizer (`summarize.js`) produces the
+  summary, quiz, and diagram instantly — **no API key, no network calls, nothing
+  leaves your machine**.
+- **Hallucination-free quiz** — every question is a fill-in-the-blank taken
+  verbatim from your PDF; the correct answer and all distractors are real terms
+  from the same document, so nothing can be invented.
+- **Download summary** — one button saves the whole recap as a readable
+  Markdown file (summary + quiz + Mermaid source).
 
 ```bash
 npx serve .          # or: python -m http.server
@@ -33,13 +36,13 @@ The full trade-off record lives in [`PLAN.md`](PLAN.md); the reasoning in short:
 |----------|-----|
 | **Hybrid: pre-generated recaps by default, upload as secondary** | The demo works offline, loads instantly, needs no API key, and costs nothing at runtime. Uploading is the escape hatch for *your* decks. |
 | **Static site, no backend, no frameworks** | Hosts free anywhere (GitHub Pages), nothing to build or maintain, no server that could leak a key. |
-| **User's own OpenRouter key in `localStorage` only** | The site never embeds a key and there is no proxy — so no shared secret to expose. Without a key, demos still work and the UI explains what to do. |
-| **Exactly one LLM call, no retry loops** | Predictable cost; a failed call shows a friendly error instead of burning credits (the `quota-safe` discipline). |
+| **Built-in extractive summarizer, zero keys** | Uploads are summarized in the browser from the PDF's own text — nothing invented, nothing sent, no key to leak or quota to burn. |
+| **Single-pass, no retry loops** | Failures show a friendly error instead of burning quota (the `quota-safe` discipline applies to offline demo generation). |
 | **One shared JSON schema for both paths** | One renderer serves pre-generated and generated recaps — no special cases. |
-| **Truncate extracted text to ~12k chars** | Bounds tokens and cost on long decks; image-only PDFs get a clear "OCR not supported" error instead of a giant prompt. |
+| **Cap uploads at 80 pages / 400k chars** | Bounds memory and processing time on huge decks; image-only PDFs get a clear "OCR not supported" error instead of a giant prompt. |
 | **Mermaid `flowchart TD`, max 12 nodes, short labels** | Directional and exam-friendly; renders from text so no image assets are needed. |
 | **Dark theme (`#0d1117` / `#e6edf3` / `#58a6ff`), mobile-first** | GitHub-style dark UI that reads well on phones; 480/768px breakpoints. |
-| **Non-goals: no OCR, no auth, no database, no persistence beyond `localStorage`** | Keeps one clean implementation pass honest — scope stays shippable. |
+| **Non-goals: no OCR, no auth, no database, no persistence** | Keeps one clean implementation pass honest — scope stays shippable. |
 
 ## Toolchain: MCP servers
 
@@ -87,9 +90,10 @@ Rules: only use facts from the slides. No invented concepts. Keep it exam-ready.
 It serves **both** paths:
 
 - **Offline generation** — instructions the assistant follows to shape extracted
-  slide text into `recap-*.json`.
-- **Browser upload** — the same rules are pasted verbatim as the system prompt of
-  the single OpenRouter call, so generated recaps match the demos.
+  slide text into `recap-*.json` (the demo decks).
+- **Browser upload** — the site no longer calls any LLM; `summarize.js` applies
+  the same *rules* extractively: points quoted from the PDF, quiz answers quoted
+  verbatim, diagram built from real section headings.
 
 ## Example run
 
@@ -145,9 +149,10 @@ The rendered result appears in the site's dropdown as
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Page structure: dropdown, upload zone, tabs, settings, boot watchdog |
+| `index.html` | Page structure: dropdown, upload zone, tabs, boot watchdog |
 | `style.css` | Dark theme, responsive layout |
-| `app.js` | Recap loading, quiz, Mermaid, pdf.js upload, OpenRouter call |
+| `app.js` | Recap loading, quiz, Mermaid, pdf.js upload → summarize.js pipeline |
+| `summarize.js` | In-browser extractive summarizer, quote-only quiz builder, diagram builder, Markdown export |
 | `recaps.json` | Manifest of demo recaps |
 | `recap-day1.json` | Sample recap (shared schema) |
 | `recap.json` | Body Language Codes recap, generated from `day1.pdf` |

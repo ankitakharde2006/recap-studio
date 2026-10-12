@@ -364,58 +364,6 @@ body {
   justify-content: flex-end;
 }
 
-/* Settings */
-.settings {
-  margin-top: calc(var(--space) * 2);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.settings summary {
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.settings[open] summary { border-bottom: 1px solid var(--border); }
-
-.settings-body {
-  padding: 1rem;
-  display: grid;
-  gap: var(--space);
-}
-
-.settings-body label {
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.settings-body input {
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.75rem;
-  font: inherit;
-  font-size: 0.95rem;
-  transition: border-color 0.15s;
-}
-
-.settings-body input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.hint {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
 /* Footer */
 .site-footer {
   border-top: 1px solid var(--border);

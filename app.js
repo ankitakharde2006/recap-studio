@@ -1,47 +1,19 @@
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
 import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+import { buildRecap, toMarkdown } from "./summarize.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
 
 mermaid.initialize({ startOnLoad: false, theme: "dark" });
 
-const MAX_TEXT_CHARS = 12000;
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-const SYSTEM_PROMPT = `You turn slide text into a recap JSON.
-
-Output a single JSON object with exactly these keys:
-- "summary": array of {topic, points[3-5 short bullets]}
-- "quiz": 8 MCQs {q, options[4], answer(index), why}
-- "diagram": Mermaid flowchart TD, max 12 nodes, short labels
-
-Rules: only use facts from the slides. No invented concepts. Keep it exam-ready.
-Output ONLY the JSON object — no markdown fences, no commentary.`;
+const MAX_PAGES = 80;
+const MAX_CHARS = 400000;
 
 const $ = (id) => document.getElementById(id);
 
-// localStorage can throw (private mode, storage blocked) — never let it break the app.
-function getLS(key, fallback = "") {
-  try {
-    const v = localStorage.getItem(key);
-    return v === null ? fallback : v;
-  } catch {
-    return fallback;
-  }
-}
-
-function setLS(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* storage unavailable — settings just won't persist */
-  }
-}
-
 let currentRecap = null;
-let currentFile = null; // file of the deck currently displayed (for dropdown revert)
-let extractedText = "";
+let currentFile = null; // manifest file of the deck displayed (null = upload)
 
 // ---------- boot ----------
 
@@ -51,7 +23,6 @@ async function init() {
   // Tell the inline watchdog in index.html that the module booted.
   window.__recapBooted = true;
   bindEvents();
-  loadSettings();
   await loadManifest();
 }
 
@@ -104,6 +75,35 @@ async function loadRecap(file) {
   }
 }
 
+function validateRecap(recap) {
+  const errs = [];
+  if (!recap || typeof recap !== "object") return ["not an object"];
+  if (!Array.isArray(recap.summary) || recap.summary.length === 0)
+    errs.push("summary must be a non-empty array");
+  else {
+    recap.summary.forEach((t) => {
+      if (typeof t.topic !== "string") errs.push("topic must be a string");
+      if (!Array.isArray(t.points) || t.points.length < 3 || t.points.length > 5)
+        errs.push("points must have 3-5 bullets");
+    });
+  }
+  if (!Array.isArray(recap.quiz) || recap.quiz.length !== 8)
+    errs.push("quiz must have exactly 8 questions");
+  else {
+    recap.quiz.forEach((q) => {
+      if (typeof q.q !== "string") errs.push("question text missing");
+      if (!Array.isArray(q.options) || q.options.length !== 4)
+        errs.push("each question needs 4 options");
+      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3)
+        errs.push("answer index must be 0-3");
+      if (typeof q.why !== "string") errs.push("question missing why");
+    });
+  }
+  if (typeof recap.diagram !== "string" || !recap.diagram.includes("flowchart"))
+    errs.push("diagram must be a Mermaid flowchart");
+  return errs;
+}
+
 // ---------- rendering ----------
 
 function renderAll() {
@@ -118,6 +118,10 @@ function renderAll() {
 function renderSummary() {
   const wrap = $("tab-summary");
   wrap.innerHTML = "";
+  if (!currentRecap.summary.length) {
+    wrap.innerHTML = '<p class="upload-sub">No summary could be built from this file.</p>';
+    return;
+  }
   const grid = document.createElement("div");
   grid.className = "summary-grid";
   currentRecap.summary.forEach((topic) => {
@@ -141,21 +145,33 @@ function renderQuiz() {
   const wrap = $("tab-quiz");
   wrap.innerHTML = "";
 
+  const quiz = currentRecap.quiz || [];
+  if (quiz.length === 0) {
+    wrap.innerHTML =
+      '<p class="upload-sub">No quiz could be built from this document — it may be too short.</p>';
+    return;
+  }
+
   const header = document.createElement("div");
   header.className = "quiz-header";
   const h3 = document.createElement("h3");
   h3.textContent = "Quiz";
   const score = document.createElement("span");
   score.className = "score";
-  score.id = "score";
-  score.textContent = `0/${currentRecap.quiz.length}`;
+  score.textContent = `0/${quiz.length}`;
   header.append(h3, score);
   wrap.appendChild(header);
+
+  const note = document.createElement("p");
+  note.className = "upload-sub";
+  note.textContent =
+    "Every question and answer is quoted directly from the document — nothing is invented.";
+  wrap.appendChild(note);
 
   let answered = 0;
   let correct = 0;
 
-  currentRecap.quiz.forEach((q, qi) => {
+  quiz.forEach((q, qi) => {
     const fs = document.createElement("fieldset");
     fs.className = "quiz-q";
     const legend = document.createElement("legend");
@@ -179,7 +195,6 @@ function renderQuiz() {
         const isCorrect = oi === q.answer;
         if (isCorrect) correct += 1;
 
-        // mark all options: correct answer green, picked wrong answer red
         fs.querySelectorAll(".quiz-opt").forEach((el, i) => {
           if (i === q.answer) el.classList.add("correct");
           else if (i === oi && !isCorrect) el.classList.add("incorrect");
@@ -191,10 +206,8 @@ function renderQuiz() {
         why.textContent = (isCorrect ? "✓ " : "✗ ") + q.why;
         fs.appendChild(why);
 
-        score.textContent = `${correct}/${currentRecap.quiz.length}`;
-        if (answered === currentRecap.quiz.length) {
-          score.textContent = `${correct}/${currentRecap.quiz.length} final`;
-        }
+        score.textContent = `${correct}/${quiz.length}` +
+          (answered === quiz.length ? " final" : "");
       });
 
       fs.appendChild(label);
@@ -246,38 +259,7 @@ function switchTab(name) {
   if (name === "diagram") renderDiagram();
 }
 
-// ---------- validation ----------
-
-function validateRecap(recap) {
-  const errs = [];
-  if (!recap || typeof recap !== "object") return ["not an object"];
-  if (!Array.isArray(recap.summary) || recap.summary.length === 0)
-    errs.push("summary must be a non-empty array");
-  else {
-    recap.summary.forEach((t) => {
-      if (typeof t.topic !== "string") errs.push("topic must be a string");
-      if (!Array.isArray(t.points) || t.points.length < 3 || t.points.length > 5)
-        errs.push("points must have 3-5 bullets");
-    });
-  }
-  if (!Array.isArray(recap.quiz) || recap.quiz.length !== 8)
-    errs.push("quiz must have exactly 8 questions");
-  else {
-    recap.quiz.forEach((q) => {
-      if (typeof q.q !== "string") errs.push("question text missing");
-      if (!Array.isArray(q.options) || q.options.length !== 4)
-        errs.push("each question needs 4 options");
-      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3)
-        errs.push("answer index must be 0-3");
-      if (typeof q.why !== "string") errs.push("question missing why");
-    });
-  }
-  if (typeof recap.diagram !== "string" || !recap.diagram.includes("flowchart"))
-    errs.push("diagram must be a Mermaid flowchart");
-  return errs;
-}
-
-// ---------- upload ----------
+// ---------- upload: PDF -> summary, quiz, diagram (all in-browser) ----------
 
 function bindEvents() {
   const zone = $("upload-zone");
@@ -309,25 +291,17 @@ function bindEvents() {
     handleFile(e.dataTransfer.files[0]);
   });
 
-  $("generate-btn").addEventListener("click", generateRecap);
-
   document.querySelectorAll(".tab").forEach((btn) =>
     btn.addEventListener("click", () => switchTab(btn.dataset.tab))
   );
 
   $("deck-select").addEventListener("change", (e) => {
-    if (e.target.value) loadRecap(e.target.value);
+    const v = e.target.value;
+    if (v) loadRecap(v);
+    else if (currentFile) e.target.value = currentFile; // revert: a demo is on screen
   });
 
-  $("download-btn").addEventListener("click", downloadJson);
-
-  // "input" (not "change") so a pasted key survives an immediate reload
-  $("api-key").addEventListener("input", (e) => {
-    setLS("openrouter_key", e.target.value.trim());
-  });
-  $("model").addEventListener("input", (e) => {
-    setLS("openrouter_model", e.target.value.trim());
-  });
+  $("download-btn").addEventListener("click", downloadMd);
 }
 
 async function handleFile(file) {
@@ -337,31 +311,45 @@ async function handleFile(file) {
     return;
   }
   $("file-name").textContent = file.name;
-  $("generate-btn").disabled = true;
   setProgress("Extracting text…");
   try {
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const pages = [];
     let text = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const maxPages = Math.min(pdf.numPages, MAX_PAGES);
+    for (let i = 1; i <= maxPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      text += content.items.map((it) => it.str).join(" ") + "\n";
-      setProgress(`Extracting text… page ${i}/${pdf.numPages}`);
-      if (text.length >= MAX_TEXT_CHARS) break;
+      let pageText = "";
+      for (const item of content.items) {
+        pageText += item.str;
+        pageText += item.hasEOL ? "\n" : " ";
+      }
+      pages.push(pageText);
+      text += pageText;
+      setProgress(`Extracting text… page ${i}/${maxPages}`);
+      if (text.length >= MAX_CHARS) break;
     }
-    text = text.trim();
-    if (!text) {
+    if (!text.trim()) {
       setStatus(
         "No selectable text found — OCR is not supported. Try a text-based PDF.",
         "err"
       );
       return;
     }
-    extractedText = text.slice(0, MAX_TEXT_CHARS);
-    $("generate-btn").disabled = false;
+    setProgress("Building summary, quiz and diagram…");
+    const recap = buildRecap(pages, file.name);
+    if (!recap.summary.length) {
+      setStatus("Could not build a summary from this file — try a text-based PDF.", "err");
+      return;
+    }
+    currentRecap = recap;
+    currentFile = null;
+    markUploadInDropdown(file.name);
+    renderAll();
     setStatus(
-      `Extracted ${extractedText.length.toLocaleString()} characters. Click Generate Recap.`,
+      "Summary ready — generated in your browser. Nothing was uploaded, no API key needed.",
       "ok"
     );
   } catch (err) {
@@ -371,124 +359,42 @@ async function handleFile(file) {
   }
 }
 
-// ---------- LLM generate (one call) ----------
-
-async function generateRecap() {
-  const key = getLS("openrouter_key");
-  if (!key) {
-    setStatus(
-      "Add your OpenRouter API key in Settings to generate recaps from PDFs. The demo recaps above stay available.",
-      "warn"
-    );
-    $("settings").open = true;
-    $("api-key").focus();
-    return;
+function markUploadInDropdown(name) {
+  const sel = $("deck-select");
+  let opt = sel.querySelector('option[data-upload]');
+  if (!opt) {
+    opt = document.createElement("option");
+    opt.value = "";
+    opt.dataset.upload = "1";
+    sel.insertBefore(opt, sel.firstChild);
   }
-  if (!extractedText) {
-    setStatus("Drop a PDF first.", "warn");
-    return;
-  }
-  const model = getLS("openrouter_model", "openrouter/auto");
-
-  setProgress(`Generating recap with ${model} (one call)…`);
-  try {
-    const res = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + key,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: "Slide text:\n\n" + extractedText }
-        ]
-      })
-    });
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      const msg = data?.error?.message || "HTTP " + res.status;
-      if (res.status === 402 || /credit/i.test(msg))
-        setStatus("OpenRouter: insufficient credits. Add credits or pick a free model in Settings.", "err");
-      else if (res.status === 401 || res.status === 403)
-        setStatus("OpenRouter rejected the API key — check it in Settings.", "err");
-      else if (res.status === 429)
-        setStatus("OpenRouter rate limited — wait a moment and retry.", "err");
-      else setStatus("OpenRouter error: " + msg, "err");
-      return;
-    }
-
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-      setStatus("The model returned no content — try again.", "err");
-      return;
-    }
-
-    let recap;
-    try {
-      recap = parseModelJson(content);
-    } catch (parseErr) {
-      setStatus(
-        "The model did not return valid JSON — try again or use a demo recap.",
-        "err"
-      );
-      return;
-    }
-    const errs = validateRecap(recap);
-    if (errs.length) {
-      setStatus(
-        "The model returned an invalid format (" + errs[0] + ") — try again or use a demo recap.",
-        "err"
-      );
-      return;
-    }
-
-    currentRecap = recap;
-    renderAll();
-    setStatus("Recap generated from your PDF.", "ok");
-  } catch (err) {
-    setStatus("Request failed — check your connection and retry. (" + err.message + ")", "err");
-  } finally {
-    setProgress(null);
-  }
+  opt.textContent = "Your upload: " + name;
+  sel.value = "";
 }
 
-function parseModelJson(content) {
-  let raw = content.trim();
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) raw = fence[1].trim();
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start !== -1 && end > start) raw = raw.slice(start, end + 1);
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error("invalid JSON from model");
-  }
+// ---------- download: readable markdown ----------
+
+function slug(s) {
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "summary"
+  );
 }
 
-// ---------- download ----------
-
-function downloadJson() {
+function downloadMd() {
   if (!currentRecap) return;
-  const blob = new Blob([JSON.stringify(currentRecap, null, 2)], {
-    type: "application/json"
-  });
+  const blob = new Blob([toMarkdown(currentRecap)], { type: "text/markdown" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "recap.json";
+  a.download = slug(currentRecap.title) + "-summary.md";
   a.click();
   URL.revokeObjectURL(a.href);
 }
 
-// ---------- settings & UI helpers ----------
-
-function loadSettings() {
-  $("api-key").value = getLS("openrouter_key");
-  $("model").value = getLS("openrouter_model", "openrouter/auto");
-}
+// ---------- UI helpers ----------
 
 function setStatus(msg, kind) {
   const el = $("status");

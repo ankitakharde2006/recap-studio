@@ -26,8 +26,8 @@
       <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
       <p class="upload-title">Upload your PDF</p>
       <p class="upload-sub">Drag &amp; drop a PDF here, or <button type="button" id="browse-btn" class="link-btn">browse files</button></p>
+      <p class="upload-sub">Summarized instantly in your browser — no API key, nothing uploaded.</p>
       <p class="file-name" id="file-name" aria-live="polite"></p>
-      <button type="button" id="generate-btn" class="btn btn-primary" disabled>Generate Recap</button>
     </section>
 
     <div id="progress" class="progress" hidden>
@@ -51,35 +51,13 @@
       <section id="tab-diagram" role="tabpanel" aria-labelledby="tabbtn-diagram" hidden></section>
 
       <div class="recap-actions">
-        <button type="button" id="download-btn" class="btn btn-secondary">Download JSON</button>
+        <button type="button" id="download-btn" class="btn btn-secondary">Download Summary (.md)</button>
       </div>
     </section>
-
-    <details class="settings" id="settings">
-      <summary>Settings — your OpenRouter API key</summary>
-      <div class="settings-body">
-        <label>
-          API key
-          <input type="password" id="api-key" placeholder="sk-or-…" autocomplete="off" spellcheck="false">
-        </label>
-        <label>
-          Model
-          <input type="text" id="model" placeholder="openrouter/auto" list="model-list" spellcheck="false">
-          <datalist id="model-list">
-            <option value="openrouter/auto"></option>
-            <option value="openai/gpt-4o-mini"></option>
-            <option value="anthropic/claude-3.5-haiku"></option>
-            <option value="google/gemini-flash-1.5"></option>
-            <option value="meta-llama/llama-3.1-8b-instruct:free"></option>
-          </datalist>
-        </label>
-        <p class="hint">Your key is stored only in this browser's localStorage. It is never written to code and is sent only to OpenRouter.</p>
-      </div>
-    </details>
   </main>
 
   <footer class="site-footer">
-    <p>Recap Studio — a static site. Demo recaps are generated offline with OpenCode, the PDF MCP server, and the pdf-recap skill.</p>
+    <p>Recap Studio — a static site. Uploads are summarized in your browser; demo recaps are generated offline with OpenCode, the PDF MCP server, and the pdf-recap skill.</p>
   </footer>
 
   <noscript>

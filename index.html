@@ -82,6 +82,27 @@
     <p>Recap Studio — a static site. Demo recaps are generated offline with OpenCode, the PDF MCP server, and the pdf-recap skill.</p>
   </footer>
 
+  <noscript>
+    <p class="status warn" style="margin: 1rem;">Recap Studio needs JavaScript to run. Please enable it and reload.</p>
+  </noscript>
+
   <script type="module" src="app.js"></script>
+  <script>
+    // Boot watchdog: if app.js or its CDN imports (pdf.js / Mermaid) fail to
+    // load, say so instead of hanging on "Loading recaps…" forever.
+    // A late boot self-heals — init() rewrites the select and status.
+    setTimeout(function () {
+      if (window.__recapBooted) return;
+      var sel = document.getElementById("deck-select");
+      if (sel) sel.innerHTML = '<option value="">Recap Studio could not start</option>';
+      var status = document.getElementById("status");
+      if (status) {
+        status.hidden = false;
+        status.className = "status err";
+        status.textContent =
+          "Recap Studio failed to start — app.js or its CDN imports did not load. Check your internet connection and reload.";
+      }
+    }, 6000);
+  </script>
 </body>
 </html>

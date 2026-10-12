@@ -27,12 +27,16 @@ Then open http://localhost:3000 (or the port shown).
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Page structure: dropdown, upload zone, tabs, settings |
+| `index.html` | Page structure: dropdown, upload zone, tabs, settings, boot watchdog |
 | `style.css` | Dark theme, responsive layout |
 | `app.js` | Recap loading, quiz, Mermaid, pdf.js upload, OpenRouter call |
 | `recaps.json` | Manifest of demo recaps |
 | `recap-day1.json` | Sample recap (shared schema) |
+| `recap.json` | Body Language Codes recap, generated from `day1.pdf` |
+| `day1.pdf` | Source deck for `recap.json` |
 | `PLAN.md` | Design plan |
+| `opencode.json` | MCP servers + `recap-reviewer` agent for offline generation |
+| `reviewer-prompt.md` | Recap review rules (missed concepts / misrepresentation / diagram) |
 
 ## Generating recaps offline (demo decks)
 
@@ -42,6 +46,14 @@ Demo recaps are produced without any browser key:
 2. The `pdf-recap` skill produces `summary` / `quiz` / `diagram` JSON.
 3. The `recap-reviewer` sub-agent checks it against the slide text and returns fixes.
 4. Save the result (e.g. `recap-day1.json`) and list it in `recaps.json`.
+
+Notes from real runs:
+
+- **pdf-reader rejects local paths** (`Please provide binary data as Uint8Array`).
+  Workaround: serve the folder over HTTP (`python -m http.server`) and pass the
+  PDF as `http://localhost:<port>/day1.pdf` instead of a file path.
+- **Sub-agent blocked by the free-tier limit?** Skip spawning: review inline in
+  the same turn per `reviewer-prompt.md`, apply fixes once, no loops.
 
 ## Recap schema
 

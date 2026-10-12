@@ -21,7 +21,26 @@ Output ONLY the JSON object — no markdown fences, no commentary.`;
 
 const $ = (id) => document.getElementById(id);
 
+// localStorage can throw (private mode, storage blocked) — never let it break the app.
+function getLS(key, fallback = "") {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v;
+  } catch {
+    return fallback;
+  }
+}
+
+function setLS(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable — settings just won't persist */
+  }
+}
+
 let currentRecap = null;
+let currentFile = null; // file of the deck currently displayed (for dropdown revert)
 let extractedText = "";
 
 // ---------- boot ----------
@@ -29,6 +48,8 @@ let extractedText = "";
 init();
 
 async function init() {
+  // Tell the inline watchdog in index.html that the module booted.
+  window.__recapBooted = true;
   bindEvents();
   loadSettings();
   await loadManifest();
@@ -60,17 +81,25 @@ async function loadManifest() {
   }
 }
 
+let loadToken = 0; // guards against out-of-order deck loads
+
 async function loadRecap(file) {
+  const token = ++loadToken;
   try {
     const res = await fetch(file);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const recap = await res.json();
     const errors = validateRecap(recap);
     if (errors.length) throw new Error(errors[0]);
+    if (token !== loadToken) return; // a newer load superseded this one
     currentRecap = recap;
+    currentFile = file;
     renderAll();
     setStatus("");
   } catch (err) {
+    if (token !== loadToken) return;
+    // Revert the dropdown to the deck actually on screen.
+    if (currentFile) $("deck-select").value = currentFile;
     setStatus("Could not load " + file + ": " + err.message, "err");
   }
 }
@@ -175,23 +204,32 @@ function renderQuiz() {
   });
 }
 
+let diagramState = { recap: null, html: "" }; // cache: render once per deck
+let mermaidSeq = 0; // collision-free element ids
+
 async function renderDiagram() {
   const wrap = $("tab-diagram");
+  const recap = currentRecap;
+  if (diagramState.recap === recap && diagramState.html) {
+    wrap.innerHTML = diagramState.html;
+    return;
+  }
   wrap.innerHTML = "";
   const box = document.createElement("div");
   box.className = "diagram-wrap";
   wrap.appendChild(box);
   try {
-    const { svg } = await mermaid.render(
-      "mermaid-" + Date.now(),
-      currentRecap.diagram
-    );
+    const { svg } = await mermaid.render("mermaid-" + ++mermaidSeq, recap.diagram);
+    if (recap !== currentRecap) return; // deck switched mid-render
     box.innerHTML = svg;
+    diagramState = { recap, html: wrap.innerHTML };
   } catch (err) {
+    if (recap !== currentRecap) return;
     const pre = document.createElement("pre");
     pre.className = "diagram-fallback";
-    pre.textContent = currentRecap.diagram;
+    pre.textContent = recap.diagram;
     box.replaceWith(pre);
+    diagramState = { recap, html: wrap.innerHTML };
     setStatus("Diagram could not be rendered — raw source shown.", "warn");
   }
 }
@@ -250,7 +288,11 @@ function bindEvents() {
     if (e.target.closest("button")) return;
     input.click();
   });
-  input.addEventListener("change", () => handleFile(input.files[0]));
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    input.value = ""; // allow re-selecting the same file
+    handleFile(file);
+  });
 
   ["dragover", "dragenter"].forEach((ev) =>
     zone.addEventListener(ev, (e) => {
@@ -279,11 +321,12 @@ function bindEvents() {
 
   $("download-btn").addEventListener("click", downloadJson);
 
-  $("api-key").addEventListener("change", (e) => {
-    localStorage.setItem("openrouter_key", e.target.value.trim());
+  // "input" (not "change") so a pasted key survives an immediate reload
+  $("api-key").addEventListener("input", (e) => {
+    setLS("openrouter_key", e.target.value.trim());
   });
-  $("model").addEventListener("change", (e) => {
-    localStorage.setItem("openrouter_model", e.target.value.trim());
+  $("model").addEventListener("input", (e) => {
+    setLS("openrouter_model", e.target.value.trim());
   });
 }
 
@@ -331,7 +374,7 @@ async function handleFile(file) {
 // ---------- LLM generate (one call) ----------
 
 async function generateRecap() {
-  const key = localStorage.getItem("openrouter_key") || "";
+  const key = getLS("openrouter_key");
   if (!key) {
     setStatus(
       "Add your OpenRouter API key in Settings to generate recaps from PDFs. The demo recaps above stay available.",
@@ -345,7 +388,7 @@ async function generateRecap() {
     setStatus("Drop a PDF first.", "warn");
     return;
   }
-  const model = localStorage.getItem("openrouter_model") || "openrouter/auto";
+  const model = getLS("openrouter_model", "openrouter/auto");
 
   setProgress(`Generating recap with ${model} (one call)…`);
   try {
@@ -383,7 +426,16 @@ async function generateRecap() {
       return;
     }
 
-    const recap = parseModelJson(content);
+    let recap;
+    try {
+      recap = parseModelJson(content);
+    } catch (parseErr) {
+      setStatus(
+        "The model did not return valid JSON — try again or use a demo recap.",
+        "err"
+      );
+      return;
+    }
     const errs = validateRecap(recap);
     if (errs.length) {
       setStatus(
@@ -434,8 +486,8 @@ function downloadJson() {
 // ---------- settings & UI helpers ----------
 
 function loadSettings() {
-  $("api-key").value = localStorage.getItem("openrouter_key") || "";
-  $("model").value = localStorage.getItem("openrouter_model") || "openrouter/auto";
+  $("api-key").value = getLS("openrouter_key");
+  $("model").value = getLS("openrouter_model", "openrouter/auto");
 }
 
 function setStatus(msg, kind) {

@@ -3,5 +3,10 @@
     "id": "day1",
     "label": "Demo: Intro to Machine Learning",
     "file": "recap-day1.json"
+  },
+  {
+    "id": "body-language",
+    "label": "Demo: Body Language Codes (Unit 5)",
+    "file": "recap.json"
   }
 ]

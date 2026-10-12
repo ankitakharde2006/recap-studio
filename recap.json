@@ -1,0 +1,104 @@
+{
+  "title": "Body Language Codes (Unit 5)",
+  "summary": [
+    {
+      "topic": "Postures",
+      "points": [
+        "Walk with drooping shoulders indicates discouragement; erect walk indicates enthusiasm",
+        "Forward leaning indicates excitement or eagerness; turning back indicates neglecting or avoiding someone",
+        "Standing ovation indicates appreciation; hands in pocket indicates immature behavior",
+        "Cross legs or arms while sitting or standing indicate disagreement with the sender",
+        "Tips: do not droop shoulders, look straight while walking, lift feet clearly, avoid slouching and crossing limbs"
+      ]
+    },
+    {
+      "topic": "Gestures",
+      "points": [
+        "Gesture means a motion of hand, head or limbs used to reinforce something that is said",
+        "Waving indicates hello or good bye; making a fist indicates anger; thumbs up shows appreciation or agreement",
+        "Scratching head indicates thinking; nodding head indicates acceptance; shrugging shoulders indicates indifference",
+        "Locking hands behind the back indicates arrogance; upraised hand indicates request for patience",
+        "Tips: avoid aggressive gestures, avoid hands in pockets, keep hand gestures above the waist"
+      ]
+    },
+    {
+      "topic": "Facial Expressions and Eye Contact",
+      "points": [
+        "Face is considered \"an index of mind\"; facial expressions are involuntary so they convey real emotions",
+        "A smile expresses friendliness and affection; raised eyebrows convey surprise; a frown shows dislike or suspicion",
+        "Furrowed forehead and lines on forehead indicate worries; pursing lips indicates lack of confidence; smirk indicates arrogance",
+        "Yawning indicates tiredness or boredom",
+        "Eye contact establishes rapport; avoiding it indicates fear, doubt and nervousness; winking indicates lying or hiding"
+      ]
+    },
+    {
+      "topic": "Dress, Voice and Silence",
+      "points": [
+        "Dress and appearance show status and attitude; adapt appearance to the occasion (formal, semi-formal, informal)",
+        "Vocalic is the study of the quality of the voice, also called paralanguage",
+        "Voice tones convey meaning: commanding (officer), shaky (nervous), high pitched (fear), gentle (respect), resonant (dynamic)",
+        "Silence is studied under vocalic; silence speaks louder than words and can be considered effective feedback"
+      ]
+    },
+    {
+      "topic": "Haptics (Touch)",
+      "points": [
+        "Haptics is derived from Greek meaning \"to touch or grasp\"; it conveys emotions like affection, anger and encouragement",
+        "Negative haptics convey anger, displeasure, hate and violence (slap, prick, handshake with pressure)",
+        "A handshake with pressure indicates domination",
+        "Positive haptics convey love, affection, respect and encouragement (pat on back, handshake, touching feet, touching shoulder)"
+      ]
+    }
+  ],
+  "quiz": [
+    {
+      "q": "Which posture indicates excitement or eagerness?",
+      "options": ["Drooping shoulders", "Forward leaning", "Crossed arms", "Turning back"],
+      "answer": 1,
+      "why": "Forward leaning indicates excitement or eagerness."
+    },
+    {
+      "q": "A thumbs up gesture shows:",
+      "options": ["Anger", "Indifference", "Appreciation or agreement", "Arrogance"],
+      "answer": 2,
+      "why": "Thumbs up shows appreciation or agreement."
+    },
+    {
+      "q": "The face is considered:",
+      "options": ["An index of mind", "A mirror of the body", "A sign of dress sense", "A measure of voice"],
+      "answer": 0,
+      "why": "The face is considered \"an index of mind\"; it exhibits attitudes."
+    },
+    {
+      "q": "Which eye behaviour indicates lying or hiding?",
+      "options": ["Direct eye contact", "Shifting eye contact", "Winking eyes", "Gazing"],
+      "answer": 2,
+      "why": "Winking eyes indicate lying or hiding."
+    },
+    {
+      "q": "The study of the quality of voice is called:",
+      "options": ["Haptics", "Vocalic", "Silence", "Posture"],
+      "answer": 1,
+      "why": "The study of the quality of the voice is called vocalic (also called paralanguage)."
+    },
+    {
+      "q": "A handshake with pressure indicates:",
+      "options": ["Friendliness", "Domination", "Respect", "Encouragement"],
+      "answer": 1,
+      "why": "A handshake with pressure is a negative haptic that indicates domination."
+    },
+    {
+      "q": "Touching the feet of a person is a gesture of:",
+      "options": ["Praise", "Console", "Respect", "Affection"],
+      "answer": 2,
+      "why": "To touch feet is to show respect — a positive haptic."
+    },
+    {
+      "q": "According to the slides, silence:",
+      "options": ["Should always be avoided", "Speaks louder than words and can be effective feedback", "Shows inability to learn", "Is not part of vocalic"],
+      "answer": 1,
+      "why": "Silence speaks louder than words and can be considered effective feedback; it is studied under vocalic."
+    }
+  ],
+  "diagram": "flowchart TD\n  A[Body Language] --> B[Postures]\n  A --> C[Gestures]\n  A --> D[Facial Expressions]\n  A --> E[Eye Contact]\n  A --> F[Dress and Appearance]\n  A --> G[Vocalic]\n  A --> H[Haptics]\n  G --> I[Silence]\n  H --> J[Negative Haptics]\n  H --> K[Positive Haptics]"
+}

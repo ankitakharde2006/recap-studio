@@ -271,6 +271,19 @@ function pointsForPage(page, heading, counts) {
 
 // ---------- quiz ----------
 
+// Complete sentences only: lines are JOINED first, then split at real
+// sentence endings — a sentence that wraps across PDF lines stays whole.
+function fullSentences(text) {
+  const flow = linesOf(text).join(" ");
+  const parts = flow
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.replace(/\s+/g, " ").trim())
+    .filter((x) => x.length >= 30 && x.length <= 600);
+  if (parts.length) return parts;
+  // No punctuation in the source: a complete slide line is a statement.
+  return linesOf(text).filter((l) => l.length >= 30 && l.length <= 600);
+}
+
 function buildQuiz(sections, counts) {
   const globalTerms = topTerms(counts, 40, 4);
   const candidates = [];
@@ -279,9 +292,9 @@ function buildQuiz(sections, counts) {
   for (let pi = 0; pi < sections.length && candidates.length < 8; pi++) {
     const sec = sections[pi];
     const secTerms = topTerms(termCounts([sec.text]), 8, 4);
-    const sents = sentencesOf(sec.text)
-      .filter((s) => s.length >= 30 && s.length <= 260)
-      .sort((a, b) => scoreSentence(b, counts) - scoreSentence(a, counts));
+    const sents = fullSentences(sec.text).sort(
+      (a, b) => scoreSentence(b, counts) - scoreSentence(a, counts)
+    );
     for (const sent of sents) {
       const target = secTerms.find((t) =>
         new RegExp("\\b" + t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "s?\\b", "i").test(sent)
@@ -295,7 +308,7 @@ function buildQuiz(sections, counts) {
   if (candidates.length < 8) {
     for (let pi = 0; pi < sections.length && candidates.length < 8; pi++) {
       if (candidates.some((c) => c.pi === pi)) continue;
-      const sent = sentencesOf(sections[pi].text).find((s) => s.length >= 30 && s.length <= 260);
+      const sent = fullSentences(sections[pi].text)[0];
       if (!sent) continue;
       const target = topTerms(termCounts([sent]), 1, 4)[0];
       if (!target) continue;
@@ -392,20 +405,79 @@ function buildDiagram(summary, counts, title) {
 
 // ---------- entry point ----------
 
+// Escape a plain word for use inside a RegExp (no backslashes needed).
+function escWord(t) {
+  return t.replace(/[^A-Za-z0-9]/g, (c) => "[" + c + "]");
+}
+
+function redactTerm(text, tok) {
+  return text
+    .replace(new RegExp("\\b" + escWord(tok) + "\\b", "gi"), " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/\s+/g, " ");
+}
+
+// Remove watermark/branding noise: a word repeated in runs ("brand brand
+// brand") is detected once, then redacted from the whole document so it
+// can never reach the summary, quiz, diagram, or title.
+function redactNoise(pages) {
+  const noise = new Set();
+  const runRe = /\b([A-Za-z][A-Za-z'-]+)(?:\s+\1){2,}/gi;
+  let m;
+  while ((m = runRe.exec(pages.join("\n")))) noise.add(m[1].toLowerCase());
+
+  if (noise.size) {
+    const counts = termCounts(pages);
+    for (const tok of [...noise]) {
+      // Only redact real (non-stopword) terms.
+      if (!counts.get(tok)) noise.delete(tok);
+    }
+  }
+  if (!noise.size) return { pages, noise };
+
+  const clean = pages
+    .map((page) =>
+      page
+        .split(/\n+/)
+        .map((line) => {
+          const had = [...noise].some((tok) =>
+            new RegExp("\\b" + escWord(tok) + "\\b", "i").test(line)
+          );
+          let out = line;
+          for (const tok of noise) out = redactTerm(out, tok);
+          out = out.trim();
+          // Drop lines that were watermark-only; keep every other line.
+          if (had && !/[a-z]{3}/i.test(out)) return "";
+          return out;
+        })
+        .filter((l) => l.length > 0)
+        .join("\n")
+    )
+    .filter((p) => p.trim());
+  return { pages: clean, noise };
+}
+
+function redactToken(text, noise) {
+  let out = text;
+  for (const tok of noise) out = redactTerm(out, tok);
+  return out.trim();
+}
+
 export function buildRecap(pages, sourceName) {
   const cleanPages = (pages || [])
     .map((p) => stripControls(p || ""))
     .filter((p) => p.trim().length > 0);
-  const counts = termCounts(cleanPages);
+  const { pages: docPages, noise } = redactNoise(cleanPages);
+  const counts = termCounts(docPages);
 
-  const noExt = (sourceName || "").replace(/\.pdf$/i, "");
-  const firstHeading = cleanPages.length
-    ? linesOf(cleanPages[0]).find(isHeading)
+  const noExt = redactToken((sourceName || "").replace(/\.pdf$/i, ""), noise);
+  const firstHeading = docPages.length
+    ? linesOf(docPages[0]).find(isHeading)
     : null;
   const title =
     (noExt && noExt.trim()) || (firstHeading ? firstHeading : "Document summary");
 
-  const sections = splitSections(cleanPages);
+  const sections = splitSections(docPages);
   const summary = buildSummary(sections, counts);
   return {
     title: capWords(title, 80),

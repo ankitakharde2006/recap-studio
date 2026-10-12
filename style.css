@@ -369,6 +369,21 @@ body {
   justify-content: flex-end;
 }
 
+/* Empty state (home starts clean) */
+.empty-state {
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 2.2rem 1.5rem;
+  text-align: center;
+}
+
+.empty-state .empty-title {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
 /* Footer */
 .site-footer {
   border-top: 1px solid var(--border);

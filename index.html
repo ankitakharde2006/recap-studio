@@ -15,7 +15,7 @@
       <label class="deck-picker">
         <span class="visually-hidden">Choose a recap</span>
         <select id="deck-select" aria-label="Choose a recap">
-          <option value="">Loading recaps…</option>
+          <option value="">— Choose a recap —</option>
         </select>
       </label>
     </div>
@@ -28,6 +28,11 @@
       <p class="upload-sub">Drag &amp; drop a PDF here, or <button type="button" id="browse-btn" class="link-btn">browse files</button></p>
       <p class="upload-sub">Summarized instantly in your browser — no API key, nothing uploaded.</p>
       <p class="file-name" id="file-name" aria-live="polite"></p>
+    </section>
+
+    <section class="empty-state" id="empty-state">
+      <p class="empty-title">Nothing here yet</p>
+      <p class="upload-sub">Drop a PDF above, or choose a demo or a past result from the dropdown — your summary, quiz and diagram will appear here.</p>
     </section>
 
     <div id="progress" class="progress" hidden>

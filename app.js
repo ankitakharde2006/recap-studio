@@ -13,7 +13,8 @@ const MAX_CHARS = 400000;
 const $ = (id) => document.getElementById(id);
 
 let currentRecap = null;
-let currentFile = null; // manifest file of the deck displayed (null = upload)
+let currentFile = null; // manifest file of the deck displayed (null = upload/history)
+let currentSelection = ""; // dropdown value matching what is on screen
 
 // ---------- boot ----------
 
@@ -33,18 +34,22 @@ async function loadManifest() {
     const res = await fetch("recaps.json");
     if (!res.ok) throw new Error("HTTP " + res.status);
     const manifest = await res.json();
-    const select = $("deck-select");
-    select.innerHTML = "";
     if (!Array.isArray(manifest) || manifest.length === 0) throw new Error("empty manifest");
+    const select = $("deck-select");
+    select.innerHTML = '<option value="">— Choose a recap —</option>';
+    const demoGroup = document.createElement("optgroup");
+    demoGroup.label = "Demo recaps";
     manifest.forEach((entry) => {
       const opt = document.createElement("option");
       opt.value = entry.file;
       opt.textContent = entry.label;
-      select.appendChild(opt);
+      demoGroup.appendChild(opt);
     });
-    await loadRecap(manifest[0].file);
+    select.appendChild(demoGroup);
+    renderHistoryOptions();
+    // The home page stays empty: nothing renders until the user chooses.
   } catch (err) {
-    $("deck-select").innerHTML = '<option value="">No demo recaps</option>';
+    $("deck-select").innerHTML = '<option value="">— Choose a recap —</option>';
     setStatus(
       "Could not load recaps.json. If you opened this page as a file:// URL, browsers block local JSON — serve this folder with a static server (npx serve . or python -m http.server) and reload.",
       "warn"
@@ -65,12 +70,13 @@ async function loadRecap(file) {
     if (token !== loadToken) return; // a newer load superseded this one
     currentRecap = recap;
     currentFile = file;
+    currentSelection = file;
     renderAll();
     setStatus("");
   } catch (err) {
     if (token !== loadToken) return;
-    // Revert the dropdown to the deck actually on screen.
-    if (currentFile) $("deck-select").value = currentFile;
+    // Revert the dropdown to the recap actually on screen.
+    $("deck-select").value = currentSelection;
     setStatus("Could not load " + file + ": " + err.message, "err");
   }
 }
@@ -107,6 +113,7 @@ function validateRecap(recap) {
 // ---------- rendering ----------
 
 function renderAll() {
+  $("empty-state").hidden = true;
   $("recap-view").hidden = false;
   $("recap-title").textContent = currentRecap.title || "Recap";
   renderSummary();
@@ -297,8 +304,17 @@ function bindEvents() {
 
   $("deck-select").addEventListener("change", (e) => {
     const v = e.target.value;
-    if (v) loadRecap(v);
-    else if (currentFile) e.target.value = currentFile; // revert: a demo is on screen
+    if (v.indexOf("history:") === 0) {
+      currentSelection = v;
+      loadHistory(v.slice(8));
+      return;
+    }
+    if (v) {
+      loadRecap(v);
+      return;
+    }
+    // Placeholder chosen: restore whatever is actually on screen.
+    e.target.value = currentSelection;
   });
 
   $("download-btn").addEventListener("click", downloadMd);
@@ -346,7 +362,9 @@ async function handleFile(file) {
     }
     currentRecap = recap;
     currentFile = null;
-    markUploadInDropdown(file.name);
+    currentSelection = "";
+    saveHistory(recap);
+    renderHistoryOptions();
     renderAll();
     setStatus(
       "Summary ready — generated in your browser. Nothing was uploaded, no API key needed.",
@@ -359,17 +377,72 @@ async function handleFile(file) {
   }
 }
 
-function markUploadInDropdown(name) {
-  const sel = $("deck-select");
-  let opt = sel.querySelector('option[data-upload]');
-  if (!opt) {
-    opt = document.createElement("option");
-    opt.value = "";
-    opt.dataset.upload = "1";
-    sel.insertBefore(opt, sel.firstChild);
+// ---------- history: past generated recaps, only via the dropdown ----------
+const HISTORY_KEY = "recapHistory";
+
+function readHistory() {
+  try {
+    const v = JSON.parse(localStorage.getItem(HISTORY_KEY));
+    return Array.isArray(v) ? v : [];
+  } catch (e) {
+    return [];
   }
-  opt.textContent = "Your upload: " + name;
-  sel.value = "";
+}
+
+function writeHistory(list) {
+  for (const n of [10, 3]) {
+    // Cap entries; retry smaller on quota errors.
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, n)));
+      return;
+    } catch (e) {
+      /* try fewer entries */
+    }
+  }
+}
+
+function saveHistory(recap) {
+  const list = readHistory();
+  list.unshift({
+    id: String(Date.now()),
+    title: recap.title || "Recap",
+    source: recap.source || "",
+    savedAt: new Date().toISOString(),
+    recap,
+  });
+  writeHistory(list);
+}
+
+function renderHistoryOptions() {
+  const select = $("deck-select");
+  const old = select.querySelector("optgroup[data-history]");
+  if (old) old.remove();
+  const list = readHistory();
+  if (list.length === 0) return;
+  const group = document.createElement("optgroup");
+  group.label = "History";
+  group.dataset.history = "1";
+  list.forEach((h) => {
+    const opt = document.createElement("option");
+    opt.value = "history:" + h.id;
+    const day = (h.savedAt || "").slice(0, 10);
+    opt.textContent = (h.title || "Recap") + (day ? " · " + day : "");
+    group.appendChild(opt);
+  });
+  select.appendChild(group);
+}
+
+function loadHistory(id) {
+  const entry = readHistory().find((x) => x.id === id);
+  if (!entry || !entry.recap) {
+    setStatus("History entry not found.", "warn");
+    $("deck-select").value = currentSelection;
+    return;
+  }
+  currentRecap = entry.recap;
+  currentFile = null;
+  renderAll();
+  setStatus("");
 }
 
 // ---------- download: readable markdown ----------

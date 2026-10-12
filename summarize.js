@@ -142,9 +142,24 @@ const LABEL_SKIP = new Set(
   )
 );
 
-function labelTerm(text) {
-  const t = topTerms(termCounts([text]), 40, 4).find((x) => !LABEL_SKIP.has(x));
-  const word = t || "Section";
+function labelTerm(text, df, total) {
+  const local = termCounts([text]);
+  const cands = [...local.entries()]
+    .filter(([w]) => w.length >= 4 && !LABEL_SKIP.has(w))
+    .map(([w, c]) => ({
+      w,
+      // A word present in EVERY section (company/brand name) would label
+      // every block identically — demote it unless nothing else exists.
+      ubiquitous: total > 1 && (df.get(w) || 0) >= total,
+      s: c * Math.log(1 + total / (df.get(w) || 1)),
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.ubiquitous) - Number(b.ubiquitous) ||
+        b.s - a.s ||
+        a.w.localeCompare(b.w)
+    );
+  const word = cands.length ? cands[0].w : "Section";
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
@@ -157,6 +172,12 @@ function stripControls(s) {
 
 function buildSummary(sections, counts) {
   const summary = [];
+  const usedPoints = new Set();
+  // Document frequency: how many sections contain each term at all.
+  const df = new Map();
+  for (const sec of sections) {
+    for (const w of new Set(words(sec.text))) df.set(w, (df.get(w) || 0) + 1);
+  }
   for (const sec of sections) {
     if (summary.length >= 8) break;
     let heading = sec.heading;
@@ -164,14 +185,49 @@ function buildSummary(sections, counts) {
       const first = linesOf(sec.text)[0];
       if (first && isHeading(first)) heading = first;
     }
-    if (!heading) heading = labelTerm(sec.text);
-    const points = pointsForPage(sec.text, heading, counts);
+    if (!heading) heading = labelTerm(sec.text, df, sections.length);
+    const candidates = pointsForPage(sec.text, heading, counts);
+    const points = [];
+    for (const p of candidates) {
+      const key = p.toLowerCase().replace(/\s+/g, " ").trim();
+      if (usedPoints.has(key)) continue;
+      usedPoints.add(key);
+      points.push(p);
+    }
     if (points.length === 0) continue;
     const topic = capWords(sanitizeLabel(heading) || "Section", 40);
     if (summary.some((t) => t.topic === topic)) continue;
-    summary.push({ topic, points: points.slice(0, 5) });
+    summary.push({ topic, points });
   }
   return summary;
+}
+
+// Split oversized blobs at word boundaries so nothing ever renders as
+// one giant paragraph.
+function chunkPoint(s, max = 240) {
+  const text = String(s).replace(/\s+/g, " ").trim();
+  if (text.length <= max) return [text];
+  const out = [];
+  let rest = text;
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf(" ", max);
+    if (cut < 60) cut = max;
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+}
+
+// Containment similarity: catches near-duplicate sentences (the same
+// sentence repeated with a small extra clause).
+function similarity(a, b) {
+  const A = new Set(words(a));
+  const B = new Set(words(b));
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const w of A) if (B.has(w)) inter++;
+  return inter / Math.min(A.size, B.size);
 }
 
 function pointsForPage(page, heading, counts) {
@@ -179,22 +235,36 @@ function pointsForPage(page, heading, counts) {
   const body = lines.filter((l) => l !== heading);
   // The deck's own numbered/bullet lines are the best points available.
   const bullets = body.filter((l) => /^([-•*]|\d+[.)])\s/i.test(l.trim()));
-  if (bullets.length >= 3) return bullets.slice(0, 5);
-
-  // Prose: join wrapped lines into one flow, then score real sentences.
-  const prose = body.join(" ").replace(/\s+/g, " ");
-  const sents = sentencesOf(prose)
-    .map((s) => ({ s, v: scoreSentence(s, counts) }))
-    .filter((x) => x.s.length >= 15)
-    .sort((a, b) => b.v - a.v)
-    .map((x) => x.s);
-  const points = sents.slice(0, 5);
-  for (const b of bullets) {
-    if (points.length >= 3) break;
-    if (!points.includes(b)) points.push(b);
+  let raw;
+  if (bullets.length >= 3) {
+    raw = bullets.slice(0, 5);
+  } else {
+    // Prose: join wrapped lines into one flow, then score real sentences.
+    const prose = body.join(" ").replace(/\s+/g, " ");
+    const sorted = sentencesOf(prose)
+      .map((s) => ({ s, v: scoreSentence(s, counts) }))
+      .filter((x) => x.s.length >= 15)
+      .sort((a, b) => b.v - a.v)
+      .map((x) => x.s);
+    // Diversify: skip sentences that mostly repeat one already picked.
+    const picked = [];
+    for (const sent of sorted) {
+      if (picked.length >= 5) break;
+      if (picked.some((p) => similarity(p, sent) > 0.6)) continue;
+      picked.push(sent);
+    }
+    for (const sent of sorted) {
+      if (picked.length >= 3) break;
+      if (!picked.includes(sent)) picked.push(sent);
+    }
+    raw = picked.slice(0, 5);
+    for (const b of bullets) {
+      if (raw.length >= 3) break;
+      if (!raw.includes(b)) raw.push(b);
+    }
+    if (raw.length === 0) raw = body.slice(0, 3);
   }
-  if (points.length === 0) points.push(...body.slice(0, 3));
-  return points;
+  return raw.flatMap((p) => chunkPoint(p)).slice(0, 5);
 }
 
 
@@ -262,22 +332,61 @@ function buildQuiz(sections, counts) {
 
 // ---------- diagram ----------
 
-function buildDiagram(summary, counts) {
+function buildDiagram(summary, counts, title) {
   let labels = summary.map((t) => sanitizeLabel(t.topic)).filter(Boolean);
   labels = [...new Set(labels)].slice(0, 11);
   if (labels.length === 0) {
     labels = topTerms(counts, 7, 4).map(sanitizeLabel).filter(Boolean);
   }
-  if (labels.length === 0) return "flowchart TD\n  A[Document]";
 
+  const rootLabel = sanitizeLabel(title || "Overview") || "Overview";
+  const PALETTE = [
+    "fill:#238636,stroke:#3fb950,color:#ffffff",
+    "fill:#8957e5,stroke:#a371f7,color:#ffffff",
+    "fill:#9e6a03,stroke:#d29922,color:#ffffff",
+    "fill:#1f6feb,stroke:#58a6ff,color:#ffffff",
+    "fill:#b3417f,stroke:#f778ba,color:#ffffff",
+    "fill:#cf222e,stroke:#ff7b72,color:#ffffff",
+  ];
   const ids = "ABCDEFGHIJKL";
-  if (labels.length === 1) return `flowchart TD\n  A[${labels[0]}]`;
+  const lines = [`  ROOT(["${rootLabel}"])`];
+  const edges = [];
 
-  // Chain in document order: reflects the deck's actual flow.
-  const lines = labels.map((l, i) => `  ${ids[i]}[${l}]`);
+  labels.forEach((l, i) => {
+    // Alternate node shapes for visual variety.
+    lines.push(i % 2 === 0 ? `  ${ids[i]}["${l}"]` : `  ${ids[i]}("${l}")`);
+    edges.push({ from: "ROOT", to: ids[i], main: false });
+  });
+  // The document flow: sections chained in reading order.
   for (let i = 1; i < labels.length; i++) {
-    lines.push(`  ${ids[i - 1]} --> ${ids[i]}`);
+    edges.push({ from: ids[i - 1], to: ids[i], main: true });
   }
+  for (const e of edges) {
+    lines.push(e.main ? `  ${e.from} ==> ${e.to}` : `  ${e.from} --> ${e.to}`);
+  }
+
+  // Colorful node classes (dark-theme palette).
+  lines.push(
+    "  classDef root fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff",
+    "  class ROOT root"
+  );
+  const byClass = new Map();
+  labels.forEach((_, i) => {
+    const c = i % PALETTE.length;
+    if (!byClass.has(c)) byClass.set(c, []);
+    byClass.get(c).push(ids[i]);
+  });
+  for (const [c, members] of byClass) lines.push(`  class ${members.join(",")} c${c}`);
+  PALETTE.forEach((style, c) => lines.push(`  classDef c${c} ${style}`));
+
+  // Flow arrows stand out, hub links stay subtle.
+  edges.forEach((e, i) => {
+    lines.push(
+      e.main
+        ? `  linkStyle ${i} stroke:#58a6ff,stroke-width:2.5px`
+        : `  linkStyle ${i} stroke:#6e7681,stroke-width:1.5px`
+    );
+  });
   return "flowchart TD\n" + lines.join("\n");
 }
 
@@ -302,7 +411,7 @@ export function buildRecap(pages, sourceName) {
     title: capWords(title, 80),
     summary,
     quiz: buildQuiz(sections, counts),
-    diagram: buildDiagram(summary, counts),
+    diagram: buildDiagram(summary, counts, title),
     source: sourceName || null,
   };
 }

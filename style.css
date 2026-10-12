@@ -294,12 +294,16 @@ body {
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
   margin: 0 0 var(--space);
+  min-inline-size: 0; /* fieldsets default to min-content: long questions would not wrap */
+  overflow-wrap: anywhere;
 }
 
 .quiz-q legend {
   font-weight: 600;
   font-size: 0.95rem;
   padding: 0 0.35rem;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .quiz-opt {
@@ -312,6 +316,7 @@ body {
   font-size: 0.95rem;
   transition: background 0.15s;
   margin-top: 0.35rem;
+  overflow-wrap: anywhere;
 }
 
 .quiz-opt:hover { background: rgba(88, 166, 255, 0.08); }

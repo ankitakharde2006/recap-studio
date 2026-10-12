@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recap Studio</title>
+  <meta name="description" content="Course-deck recaps: summary, quiz, and diagram from a single JSON file.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F4DA;</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <h1>Recap Studio</h1>
+      <label class="deck-picker">
+        <span class="visually-hidden">Choose a recap</span>
+        <select id="deck-select" aria-label="Choose a recap">
+          <option value="">Loading recaps…</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="upload-card" id="upload-zone" aria-label="Upload a PDF">
+      <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
+      <p class="upload-title">Upload your PDF</p>
+      <p class="upload-sub">Drag &amp; drop a PDF here, or <button type="button" id="browse-btn" class="link-btn">browse files</button></p>
+      <p class="file-name" id="file-name" aria-live="polite"></p>
+      <button type="button" id="generate-btn" class="btn btn-primary" disabled>Generate Recap</button>
+    </section>
+
+    <div id="progress" class="progress" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="progress-text">Working…</p>
+    </div>
+
+    <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+
+    <section class="recap-view" id="recap-view" hidden>
+      <h2 class="recap-title" id="recap-title"></h2>
+
+      <nav class="tabs" role="tablist" aria-label="Recap sections">
+        <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="summary" id="tabbtn-summary">Summary</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" data-tab="quiz" id="tabbtn-quiz">Quiz</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" data-tab="diagram" id="tabbtn-diagram">Diagram</button>
+      </nav>
+
+      <section id="tab-summary" role="tabpanel" aria-labelledby="tabbtn-summary"></section>
+      <section id="tab-quiz" role="tabpanel" aria-labelledby="tabbtn-quiz" hidden></section>
+      <section id="tab-diagram" role="tabpanel" aria-labelledby="tabbtn-diagram" hidden></section>
+
+      <div class="recap-actions">
+        <button type="button" id="download-btn" class="btn btn-secondary">Download JSON</button>
+      </div>
+    </section>
+
+    <details class="settings" id="settings">
+      <summary>Settings — your OpenRouter API key</summary>
+      <div class="settings-body">
+        <label>
+          API key
+          <input type="password" id="api-key" placeholder="sk-or-…" autocomplete="off" spellcheck="false">
+        </label>
+        <label>
+          Model
+          <input type="text" id="model" placeholder="openrouter/auto" list="model-list" spellcheck="false">
+          <datalist id="model-list">
+            <option value="openrouter/auto"></option>
+            <option value="openai/gpt-4o-mini"></option>
+            <option value="anthropic/claude-3.5-haiku"></option>
+            <option value="google/gemini-flash-1.5"></option>
+            <option value="meta-llama/llama-3.1-8b-instruct:free"></option>
+          </datalist>
+        </label>
+        <p class="hint">Your key is stored only in this browser's localStorage. It is never written to code and is sent only to OpenRouter.</p>
+      </div>
+    </details>
+  </main>
+
+  <footer class="site-footer">
+    <p>Recap Studio — a static site. Demo recaps are generated offline with OpenCode, the PDF MCP server, and the pdf-recap skill.</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

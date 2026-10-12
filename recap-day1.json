@@ -1,0 +1,123 @@
+{
+  "title": "Intro to Machine Learning",
+  "summary": [
+    {
+      "topic": "What is Machine Learning",
+      "points": [
+        "ML lets computers learn patterns from data without explicit programming",
+        "Three main types: supervised, unsupervised, and reinforcement learning",
+        "Supervised learning learns from labeled training data",
+        "Performance is measured on held-out test data"
+      ]
+    },
+    {
+      "topic": "Supervised Learning",
+      "points": [
+        "Classification predicts a category; regression predicts a number",
+        "Training data pairs each input with a correct label",
+        "Overfitting means memorizing training data instead of learning patterns",
+        "Common algorithms: linear regression, decision trees, k-nearest neighbors"
+      ]
+    },
+    {
+      "topic": "Unsupervised & Reinforcement Learning",
+      "points": [
+        "Unsupervised learning finds hidden structure in unlabeled data",
+        "Clustering groups similar examples, e.g. k-means",
+        "Reinforcement learning learns from rewards and penalties",
+        "An agent takes actions in an environment to maximize cumulative reward"
+      ]
+    }
+  ],
+  "quiz": [
+    {
+      "q": "What is machine learning?",
+      "options": [
+        "Programming every rule by hand",
+        "Learning patterns from data without explicit programming",
+        "A database query language",
+        "A type of computer hardware"
+      ],
+      "answer": 1,
+      "why": "ML is defined by learning patterns from data instead of following hand-written rules."
+    },
+    {
+      "q": "Which type of machine learning uses labeled training data?",
+      "options": [
+        "Supervised learning",
+        "Unsupervised learning",
+        "Reinforcement learning",
+        "Clustering"
+      ],
+      "answer": 0,
+      "why": "Supervised learning pairs each input with a correct label during training."
+    },
+    {
+      "q": "What is overfitting?",
+      "options": [
+        "The model is too small",
+        "The model memorizes training data and does poorly on new data",
+        "Training takes too long",
+        "The test set is too large"
+      ],
+      "answer": 1,
+      "why": "Overfitting means the model learned noise and specifics of the training set instead of general patterns."
+    },
+    {
+      "q": "What is the purpose of a test set?",
+      "options": [
+        "To train the model faster",
+        "To label the data",
+        "To measure performance on unseen data",
+        "To increase the dataset size"
+      ],
+      "answer": 2,
+      "why": "A test set is held out from training to estimate how the model performs on new examples."
+    },
+    {
+      "q": "Which algorithm is unsupervised?",
+      "options": [
+        "Linear regression",
+        "Decision tree classifier",
+        "k-means clustering",
+        "k-nearest neighbors classifier"
+      ],
+      "answer": 2,
+      "why": "k-means groups unlabeled data into clusters without any labels."
+    },
+    {
+      "q": "How does reinforcement learning learn?",
+      "options": [
+        "From labeled examples",
+        "From rewards and penalties",
+        "From clustering",
+        "From a fixed rulebook"
+      ],
+      "answer": 1,
+      "why": "An agent improves by maximizing cumulative reward through trial and error."
+    },
+    {
+      "q": "What is the difference between classification and regression?",
+      "options": [
+        "Classification predicts categories; regression predicts numbers",
+        "Classification is unsupervised; regression is supervised",
+        "Regression predicts categories; classification predicts numbers",
+        "There is no difference"
+      ],
+      "answer": 0,
+      "why": "Classification outputs a class label, while regression outputs a continuous value."
+    },
+    {
+      "q": "What is the goal of clustering?",
+      "options": [
+        "To predict a numeric value",
+        "To group similar examples together",
+        "To label data manually",
+        "To maximize rewards"
+      ],
+      "answer": 1,
+      "why": "Clustering finds natural groups in unlabeled data by similarity."
+    }
+  ],
+  "diagram": "flowchart TD\n  A[Raw Data] --> B[Preprocessing]\n  B --> C[Training Set]\n  B --> D[Test Set]\n  C --> E[Model]\n  E --> F[Evaluation]\n  D --> F\n  F --> G{Accuracy OK?}\n  G -->|No| E\n  G -->|Yes| H[Deploy]"
+}
